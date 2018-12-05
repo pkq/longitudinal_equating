@@ -33,6 +33,9 @@ However, one could also consider the set of scores over all time points simultan
 ```{r}
 options(stringsAsFactors = FALSE)
 '%!in%' <- function(x,y)!('%in%'(x,y))
+source(paste(r_dir, "linear_equate_x_to_y1.R", sep = "/"))
+source(paste(r_dir, "linear_equate_x_to_y2.R", sep = "/"))
+source(paste(r_dir, "mv_linear_equate_x_to_y.R", sep = "/"))
 
 ```
 
@@ -43,13 +46,11 @@ fn <- paste0(measure, "-raw.csv")
 ttl <- read.csv(file = paste(d_dir, fn, sep = "/"))
 ```
 
-
 ```{r}
 grd <- 2
 
 ## Subset grade
 ttl_g <- ttl[ttl$grade == grd, ]
-
 
 ## subset forms
 table(ttl_g$probe_id, ttl_g$season)
@@ -179,47 +180,15 @@ xEmpMat %>%
 
 #### Linear equating function
 
-Next, we define the linear equating function to match that of defined in Kolen and Brennan. 
 
-```{r, echo=TRUE}
-linear_equate_x_to_y1 <- function(x, muY, sigmaY, muX, sigmaX)
-{
-  sigmaYBysigmaX <- sigmaY / sigmaX
-
-  xEquateToY <- (sigmaYBysigmaX * x) + (muY - (sigmaYBysigmaX * muX)) 
-  
-  return(cbind.data.frame(rawX = x, equatedX = round(xEquateToY)))
-}
-```
-
-`x` takes the observed score on the benchmark form
-`muY` takes the mean for the anchor form
-`sigmaY` takes the standard deviation for the anchor form
-`muX` takes the mean for the benchmark form
-`sigmaX` takes the standard deviation of the benchmark for 
-
-
-We can also accomplish the same process using empirical variances instead of standard deviations. This solution proves more general when moving to a matrix solution. 
+We can equate the tests using empirical variances instead of standard deviations. This solution proves more general when moving to a matrix solution. 
 
 $$
 l_{a}(b) = \left(\frac{\sigma^{2}_{a}}{\sigma^{2}_{b}} \right)^{1/2} \mu_{b} + \left[ \mu_{a} - \left(\frac{\sigma^{2}_{a}}{\sigma^{2}_{b}} \right)^{1/2}\mu_{b} \right]
 $$
 
 
-```{r}
-linear_equate_x_to_y2 <- function(x, muY, sigmaY, muX, sigmaX)
-{
-  sigmaYBysigmaX <- sigmaY / sigmaX
-
-  sqrt_sigmaYBysigmaX <- sqrt(sigmaYBysigmaX)
-
-  xEquateToY <- (sqrt_sigmaYBysigmaX * x) + (muY - (sqrt_sigmaYBysigmaX * muX)) 
-  
-  return(cbind.data.frame(rawX = x, equatedX = round(xEquateToY)))
-}
-```
-
-
+The following demonstrates that the equation above, namely taking the square root of the divisor of the variances is identical to divding the standard deviations.
 
 ```{r, echo=TRUE}
 xVec <- seq(from = 75, to = 175, by = 5)
@@ -240,7 +209,6 @@ cbind(raw = linEqXToYSd[, 1], "u-eq1" = linEqXToYSd[, 2], "u-eq2" = linEqXToYVar
 ```
 
 
-
 ### Multivariate linear equating
 
 Now, suppose we want to extend the univariate linking solution to equate a set of scores based on a set of means and variances. That is, rather than input a scalar value for the mean and variance, we utilize a vector valued mean and covariance matrix. 
@@ -251,18 +219,6 @@ l_{a}(b) = \textrm{Chol}\left(\Sigma_{a}\Sigma_{b}^{-1}\right) \mu_{b} + \left[ 
 $$
 
 
-```{r, echo=TRUE}
-mv_linear_equate_x_to_y <- function(xVec, yMeanVec, yCovMat, xMeanVec, xCovMat)
-{
-
-  SigmaYInvSigmaX <- yCovMat %*% solve(xCovMat)
-  cholSigmaYInvSigmaX <- chol(SigmaYInvSigmaX)
- 
-  xEquateToY <- cholSigmaYInvSigmaX %*% xVec + (yMeanVec - cholSigmaYInvSigmaX %*% xMeanVec)  
-
-  return(cbind.data.frame(rawX = xVec, equatedX = round(xEquateToY)))
-}
-```
 
 `xVec` takes a vector of total scores. 
 `yMeanVec` takes the vector of means for the repeated anchor form
@@ -310,7 +266,6 @@ We see that based on the first 10 score sequences, the results from `mv_linear_e
 ```{r}
  equate_out[1:10] 
 ```
-
 
 ### Multivariate linear equating with model-implied moments
 
@@ -364,7 +319,7 @@ We then do the same thing using the series of benchmark forms.
 
 
 $$
-{\bf z}_{i} = {\bf X}_{i} \, \beta + {\bf Z}_{i} \, \zeta_{i} + \epsilon_{i}
+{\bf w}_{i} = {\bf X}_{i} \, \beta + {\bf Z}_{i} \, \zeta_{i} + \epsilon_{i}
 $$
 where
 $$
@@ -399,27 +354,39 @@ list(xMeanVec, xCovMat)
 
 Equating with vector of model implied means and covariance matrices compared to empirical variances. 
 
+`m-eq1` uses of the sample means and variances
+`m-eq2` uses of the model-implied means and variances (contraining the covariances to zero)
+`m-eq3` uses of the model-implied means and covariance matrix (same variances as `m-eq2` with covariances unconstrained)
+
 ```{r, echo=TRUE}
 compare_equate_out2 <- list()
 
-for(jj in 1:nrow(sub_ttl_g_w))
+for (jj in 1:nrow(sub_ttl_g_w))
 {
   xVec_j <-  t(unname(as.matrix(sub_ttl_g_w[jj, ])))
 
-  mv1Out <- mv_linear_equate_x_to_y(xVec = xVec_j, 
+  mv1Out <- mv_linear_equate_x_to_y(xVec     = xVec_j, 
                                     yMeanVec = yEmpMeanVec, 
-                                    yCovMat = diag(yEmpVarVec), 
+                                    yCovMat  = diag(yEmpVarVec), 
                                     xMeanVec = xEmpMeanVec, 
-                                    xCovMat = diag(xEmpVarVec))
+                                    xCovMat  = diag(xEmpVarVec))
   
-  
-  mv2Out <- mv_linear_equate_x_to_y(x = xVec_j, 
+  mv2Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
+                                    yMeanVec = yModMeanVec, 
+                                    yCovMat  = diag(diag(yModCovMat)), 
+                                    xMeanVec = xModMeanVec, 
+                                    xCovMat  = diag(diag(xModCovMat))) 
+
+  mv3Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
                                     yMeanVec = yModMeanVec, 
                                     yCovMat  = yModCovMat, 
-                                    xMeanVec  = xModMeanVec, 
+                                    xMeanVec = xModMeanVec, 
                                     xCovMat  = xModCovMat)
   
-  compare_equate_out2[[jj]] <- cbind(raw = mv1Out[, 1], "m-eq1" = mv1Out[, 2], "m-eq2" = mv2Out[, 2])
+  compare_equate_out2[[jj]] <- cbind("raw"   = mv1Out[, 1], 
+                                     "m-eq1" = mv1Out[, 2], 
+                                     "m-eq2" = mv2Out[, 2], 
+                                     "m-eq3" = mv3Out[, 2])
 }
         
 compare_equate_out2[1:10]

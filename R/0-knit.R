@@ -5,7 +5,7 @@ library(matrixcalc)
 library(lme4)
 
 
-proj  <- "equate-ctl"
+proj  <- "longitudinal_equating"
 h_dir <- "~/Dropbox/Research"
 p_dir <- paste(h_dir, proj, sep = "/")
 r_dir <- paste(p_dir, "R", sep = "/")
@@ -16,7 +16,6 @@ source(paste(r_dir, "EM_y.R", sep = "/"))
 source(paste(r_dir, "emMeanCov.R", sep = "/"))
 
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE)
-
 
 rmarkdown::render(input = paste(r_dir, 'orf-explore.Rmd', sep = "/"))
 
