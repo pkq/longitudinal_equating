@@ -1,0 +1,182 @@
+---
+title: "WRF Exploration"
+author: "Tyler H. Matta"
+output:
+  html_document: default
+  pdf_document: default
+header-includes:
+    - \usepackage{bm}
+---
+
+
+```{r}
+options(stringsAsFactors = FALSE)
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+```
+
+```{r loadData}
+wrf <- read.csv(file = paste(d_dir, "wrf-raw.csv", sep = "/"))
+
+#nrow(wrf)
+#length(unique(wrf$anon_id))
+
+wrf_g <- wrf[wrf$grade == 3, ]
+wrf_g <- wrf_g[wrf_g$benchmark == 1 | wrf_g$anchor == 1, ]
+
+nrow(wrf_g)
+length(unique(wrf_g$anon_id))
+
+table(wrf_g$probe_id, wrf_g$benchmark)
+table(wrf_g$probe_id, wrf_g$anchor)
+
+table(wrf_g$probe_id, wrf_g$season)
+
+
+head(wrf_g)
+```
+
+
+We are examining the WRF anchor form, and the three benchmark forms for Grade 2. 
+
+
+## Examinee Frequencies by Form and Season
+
+
+```{r, echo=FALSE}
+freqByFormAndSeason <- table(wrf_g$probe_id, wrf_g$season)
+
+freqByFormAndSeason %>%
+  kable() %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left") #%>%
+  #add_header_above(c("Form" = 1, "Season" = 3))
+
+```
+
+
+### WpM Distributions
+
+```{r, echo=FALSE, fig.width=9, fig.height=6}
+par(mfrow = c(2, 3))
+hist(wrf_g$total[wrf_g$probe_id == 4 & wrf_g$season == 1], ylim = c(0, 100), xlim = c(0, 150),
+     main = "Season 1, Form 4", xlab = "Words per Minute")
+hist(wrf_g$total[wrf_g$probe_id == 4 & wrf_g$season == 2], ylim = c(0, 100), xlim = c(0, 150),
+     main = "Season 2, Form 4", xlab = "Words per Minute")
+hist(wrf_g$total[wrf_g$probe_id == 4 & wrf_g$season == 3], ylim = c(0, 100), xlim = c(0, 150),
+     main = "Season 3, Form 4", xlab = "Words per Minute")
+hist(wrf_g$total[wrf_g$probe_id == 1 & wrf_g$season == 1], ylim = c(0, 100), xlim = c(0, 150),
+     main = "Season 1, Form 1", xlab = "Words per Minute")
+hist(wrf_g$total[wrf_g$probe_id == 2 & wrf_g$season == 2], ylim = c(0, 100), xlim = c(0, 150),
+     main = "Season 2, Form 2", xlab = "Words per Minute")
+hist(wrf_g$total[wrf_g$probe_id == 3 & wrf_g$season == 3], ylim = c(0, 100), xlim = c(0, 150),
+     main = "Season 3, Form 3", xlab = "Words per Minute")
+```
+
+
+```{r}
+dupIdSeason <- which(duplicated(wrf_g[, c("anon_id", "season")]))
+
+idWithTwoForms <- unique(wrf_g$anon_id[dupIdSeason])
+
+wrf_g$took2 <- ifelse(wrf_g$anon_id %in% idWithTwoForms, 1, 0)
+
+where2 <- aggregate(wrf_g$took2, by = list(id = wrf_g$anon_id, season = wrf_g$season), length)
+where2 <- where2[order(where2$id, where2$season), ]
+where2 <- where2[where2$x > 1, ]
+
+# length(unique(where2$id))
+
+table(where2$season)
+```
+
+
+```{r}
+wrf_g$season_probe <- paste(wrf_g$season, wrf_g$probe_id, sep = "-")
+
+wrf_g_w <- reshape(wrf_g[, c("anon_id", "season_probe", "total")],
+                    timevar = "season_probe",
+                    idvar = c("anon_id"),
+                    direction = "wide", sep = "-")
+head(wrf_g_w)
+wrf_g_w <- wrf_g_w[, c("anon_id", "total-1-4", "total-2-4", "total-3-4", 
+                                "total-1-1", "total-2-2", "total-3-3")]
+
+wrf_g_w$anchor_cnt <- apply(wrf_g_w[, c("total-1-4", "total-2-4", "total-3-4")], 1, 
+                        FUN = function(x) sum(!is.na(x)) )
+
+wrf_g_w$bnchmrk_cnt <- apply(wrf_g_w[, c("total-1-1", "total-2-2", "total-3-3")], 1, 
+                        FUN = function(x) sum(!is.na(x)) )
+
+wrf_g_w$s1f4 <- ifelse(is.na(wrf_g_w$`total-1-4`), "0", "A")
+wrf_g_w$s1f1 <- ifelse(is.na(wrf_g_w$`total-1-1`), "0", "B")
+wrf_g_w$s2f4 <- ifelse(is.na(wrf_g_w$`total-2-4`), "0", "A")
+wrf_g_w$s2f2 <- ifelse(is.na(wrf_g_w$`total-2-2`), "0", "B")
+wrf_g_w$s3f4 <- ifelse(is.na(wrf_g_w$`total-3-4`), "0", "A")
+wrf_g_w$s3f3 <- ifelse(is.na(wrf_g_w$`total-3-3`), "0", "B")
+
+wrf_g_w$pattern <- paste0(wrf_g_w$s1f4, wrf_g_w$s1f1, "-", 
+                         wrf_g_w$s2f4, wrf_g_w$s2f2, "-", 
+                         wrf_g_w$s3f4, wrf_g_w$s3f3)
+
+formPattern <- table(Pattern = wrf_g_w$pattern)
+data.frame(formPattern)
+formPattern %>%
+  kable() %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+```
+
+
+
+```{r}
+
+#!is.na(wrf_g_w$`total-1-4`)
+
+
+#init_means <- colMeans(wrf_g_w[, c("total-1-4", "total-2-4", "total-3-4")], na.rm = TRUE)
+
+#init_cov <- cov(wrf_g_w[, c("total-1-4", "total-2-4", "total-3-4")], use = "pairwise.complete.obs")
+
+#init_cov[3, 1] <- init_cov[1, 3] <- 550
+
+#inits <- list(init_means, init_cov)
+#is.positive.definite(init_cov, tol=1e-8)
+
+#emMeanCov(wrf_g_w[, c("total-1-4", "total-2-4", "total-3-4")], inits = inits)
+#EM_y(wrf_g_w[, c("total-1-4", "total-2-4", "total-3-4")])
+
+#ach_m1 <- lmer(total ~ 1 + season + (1 | anon_id), data = wrf_g[wrf_g$anchor == 1, ])
+
+#anchor_vcov <- as.data.frame(VarCorr(ach_m1))$vcov
+
+
+#int <- rep(1, max(unique(wrf_g$season))) 
+#slp <- seq(0, max(wrf_g$season)-1)
+#Z <- as.matrix(int)
+
+#Z %*% anchor_vcov[1] %*% t(Z)
+
+
+```
+$$
+l_{y}(x) = \frac{\sigma_{y}}{\sigma_{x}}\mu_{x} + \left[ \mu_{y} - \frac{\sigma_{y}}{\sigma_{x}}\mu_{x} \right]
+$$
+
+$$
+l_{\bf{y}}({\bf x}) = \Sigma_{y}\Sigma_{x}^{-1} \mu_{x} + \left[ \mu_{y} - \Sigma_{y}\Sigma_{x}^{-1}\mu_{x} \right]
+$$
+
+
+
+$$
+\bf{y}_{i} = \bf{X}_{i} \, \beta + \bf{Z}_{i} \, \zeta_{i} + \epsilon_{i}
+$$
+
+\begin{align}
+\mu_{y} &= \bf{X}_{i} \, \beta \\
+\Sigma_{y} &= \bf{Z} \, T \, \bf{Z}^{\prime} + \phi^{2} \bf{I}
+\end{align}
+
+
+
+
