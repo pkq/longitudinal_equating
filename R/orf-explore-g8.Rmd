@@ -70,7 +70,7 @@ ttl <- read.csv(file = paste(d_dir, fn, sep = "/"))
 ```
 
 ```{r}
-grd <- 2
+grd <- 8
 
 ## Subset grade
 ttl_g <- ttl[ttl$grade == grd, ]
@@ -243,17 +243,15 @@ list("Y Mean Vector" = yEmpMeanVec, "Y Variances" = diag(yEmpVarVec), "X Mean Ve
       
 ```{r}
 sub_ttl_g_w <- (ttl_g_w[ttl_g_w$pattern == "AB-AB-AB", ])
-sub1_ttl_g_w <- sub_ttl_g_w[, c("total-1-1", "total-2-2", "total-3-3")]
-sub2_ttl_g_w <- sub_ttl_g_w[, c("total-1-4", "total-2-4", "total-3-4")]
-
+sub_ttl_g_w <- sub_ttl_g_w[, c("total-1-1", "total-2-2", "total-3-3")]
 ```
 
 ```{r, echo=TRUE}
 equate_out <- list()
 
-for(jj in 1:nrow(sub1_ttl_g_w))
+for(jj in 1:nrow(sub_ttl_g_w))
 {
-  xVec_j <-  t(unname(as.matrix(sub1_ttl_g_w[jj, ])))
+  xVec_j <-  t(unname(as.matrix(sub_ttl_g_w[jj, ])))
 
   mvOut <- mv_linear_equate_x_to_y(xVec = xVec_j, 
                 yMeanVec = yEmpMeanVec, 
@@ -269,8 +267,6 @@ for(jj in 1:nrow(sub1_ttl_g_w))
                         sigmaX = xEmpVarVec)
   
   equate_out[[jj]] <- cbind("raw" = uvOut[, 1], "u-eq" = uvOut[, 2], "m-eq" = mvOut[, 2])
-  rownames(equate_out[[jj]]) <- paste("Season", 1:3)
-
 }
 ```
 
@@ -290,55 +286,22 @@ We now use `mv_linear_equate_x_to_y` to equate the benchmark forms using model-i
 
 ### Model-based means and covariance matrix
 
+We begin by establishing the design matricies for a random intercepts and slopes growth model. Not that we are constraining the curve to be linear as there are only three time points. 
+
 ```{r, echo=TRUE}
-J <- max(unique(ttl_g$season))
-int <- rep(1, J) 
-slp <- seq(0, J-1)
+int <- rep(1, max(unique(ttl_g$season))) 
+slp <- seq(0, max(ttl_g$season)-1)
 Z <- X <- as.matrix(cbind(int, slp))
 ```
 
-
-### Random intercepts model
-
 Next, we fit 
 
 ```{r, echo=TRUE}
-aM1 <- lmer(total ~ 1 + season + (1 | anon_id), data = ttl_g[ttl_g$probe_id %in% anchorId, ])
-bM1 <- lmer(total ~ 1 + season + (1 | anon_id), data = ttl_g[ttl_g$probe_id %in% benchmarkId, ])
+aM1 <- lmer(total ~ 1 + season + (1 + season | anon_id), data = ttl_g[ttl_g$probe_id %in% anchorId, ])
+bM1 <- lmer(total ~ 1 + season + (1 + season | anon_id), data = ttl_g[ttl_g$probe_id %in% benchmarkId, ])
 
 #-- extract variance components 
 aVarComp <- as.data.frame(VarCorr(aM1, order = "lower.tri"))$vcov
-
-aVar   <- aVarComp[1]
-aResid <- aVarComp[2]
-
-bVarComp <- as.data.frame(VarCorr(bM1, order = "lower.tri"))$vcov
-
-bVar   <- bVarComp[1]
-bResid <- bVarComp[2]
-
-#-- compute marginal means and covariance matrix
-aM1CovMat <- diag(rep(aVar, J)) + diag(rep(aResid, nrow(Z)))
-aM1MeanVec <- X %*% fixef(aM1)
-
-bM1CovMat <- diag(rep(bVar, J)) + diag(rep(bResid, nrow(Z)))
-bM1MeanVec <- X %*% fixef(bM1)
-
-list(aM1MeanVec, aM1CovMat, bM1MeanVec, bM1CovMat)
-```
-
-We begin by establishing the design matricies for a random intercepts and slopes growth model. Not that we are constraining the curve to be linear as there are only three time points. 
-
-### Random intercepts and trend model
-
-Next, we fit 
-
-```{r, echo=TRUE}
-aM2 <- lmer(total ~ 1 + season + (1 + season | anon_id), data = ttl_g[ttl_g$probe_id %in% anchorId, ])
-bM2 <- lmer(total ~ 1 + season + (1 + season | anon_id), data = ttl_g[ttl_g$probe_id %in% benchmarkId, ])
-
-#-- extract variance components 
-aVarComp <- as.data.frame(VarCorr(aM2, order = "lower.tri"))$vcov
 
 aCovMat <- matrix(NA, 2, 2)
 aCovMat[1, 1] <- aVarComp[1]
@@ -346,7 +309,7 @@ aCovMat[2, 2] <- aVarComp[2]
 aCovMat[1, 2] <- aCovMat[2, 1] <- aVarComp[3]
 aResid <- aVarComp[4]
 
-bVarComp <- as.data.frame(VarCorr(bM2, order = "lower.tri"))$vcov
+bVarComp <- as.data.frame(VarCorr(bM1, order = "lower.tri"))$vcov
 
 bCovMat <- matrix(NA, 2, 2)
 bCovMat[1, 1] <- bVarComp[1]
@@ -355,20 +318,21 @@ bCovMat[1, 2] <- bCovMat[2, 1] <- bVarComp[3]
 bResid <- bVarComp[4]
 
 #-- compute marginal means and covariance matrix
-aM2CovMat <- Z %*% aCovMat %*% t(Z) + diag(rep(aResid, nrow(Z)))
-aM2MeanVec <- X %*% fixef(aM1)
+yModCovMat <- Z %*% aCovMat %*% t(Z) + diag(rep(aResid, nrow(Z)))
+yModMeanVec <- X %*% fixef(aM1)
 
-bM2CovMat <- Z %*% bCovMat %*% t(Z) + diag(rep(bResid, nrow(Z)))
-bM2MeanVec <- X %*% fixef(bM1)
+xModCovMat <- Z %*% bCovMat %*% t(Z) + diag(rep(bResid, nrow(Z)))
+xModMeanVec <- X %*% fixef(bM1)
 
 ```
 
 We then use the full covariance in the equating solution as well as the covariance matrix with the off-diagonals constrained to zero.  Note that we are only doing this for purposes of comparison.  
 
 ```{r}
-list(aM2MeanVec, aM2CovMat, bM2MeanVec, bM2CovMat)
+list(yModMeanVec, yModCovMat, xModMeanVec, xModCovMat)
 
-list(aM2MeanVec, diag(diag(aM2CovMat)), bM2MeanVec, diag(diag(bM2CovMat)))
+list(yModMeanVec, diag(diag(yModCovMat)), xModMeanVec, diag(diag(xModCovMat)))
+
 ```
 
 #### Multidimensional Equating
@@ -376,77 +340,47 @@ list(aM2MeanVec, diag(diag(aM2CovMat)), bM2MeanVec, diag(diag(bM2CovMat)))
 
 Equating with vector of model implied means and covariance matrices compared to empirical variances. 
 
-*  `s-eq1` uses of the sample means and variances
-*  `m-eq1` uses of the random intercept model-implied means and variances (contraining the covariances to zero)
-*  `m-eq2(1)` uses of the random coefficient model-implied means and variances (contraining the covariances to zero)
-*  `m-eq2(2)` uses of the model-implied means and covariance matrix (same variances as `m-eq2` with covariances unconstrained)
+*  `m-eq1` uses of the sample means and variances
+*  `m-eq2` uses of the model-implied means and variances (contraining the covariances to zero)
+*  `m-eq3` uses of the model-implied means and covariance matrix (same variances as `m-eq2` with covariances unconstrained)
 
 ```{r, echo=TRUE}
 compare_equate_out2 <- list()
 
-for (jj in 1:nrow(sub1_ttl_g_w))
+for (jj in 1:nrow(sub_ttl_g_w))
 {
-  xVec_j <-  t(unname(as.matrix(sub1_ttl_g_w[jj, ])))
+  xVec_j <-  t(unname(as.matrix(sub_ttl_g_w[jj, ])))
 
-  mvS1Out <- mv_linear_equate_x_to_y(xVec    = xVec_j, 
+  mv1Out <- mv_linear_equate_x_to_y(xVec     = xVec_j, 
                                     yMeanVec = yEmpMeanVec, 
                                     yCovMat  = diag(yEmpVarVec), 
                                     xMeanVec = xEmpMeanVec, 
                                     xCovMat  = diag(xEmpVarVec))
   
-  mvM1Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
-                                    yMeanVec = aM1MeanVec, 
-                                    yCovMat  = diag(diag(aM1CovMat)), 
-                                    xMeanVec = bM1MeanVec, 
-                                    xCovMat  = diag(diag(bM1CovMat))) 
+  mv2Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
+                                    yMeanVec = yModMeanVec, 
+                                    yCovMat  = diag(diag(yModCovMat)), 
+                                    xMeanVec = xModMeanVec, 
+                                    xCovMat  = diag(diag(xModCovMat))) 
 
-  mvM21Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
-                                    yMeanVec = aM2MeanVec, 
-                                    yCovMat  = diag(diag(aM2CovMat)), 
-                                    xMeanVec = bM2MeanVec, 
-                                    xCovMat  = diag(diag(bM2CovMat))) 
-
-  mvM22Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
-                                    yMeanVec = aM2MeanVec, 
-                                    yCovMat  = aM2CovMat, 
-                                    xMeanVec = bM2MeanVec, 
-                                    xCovMat  = bM2CovMat)
+  mv3Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
+                                    yMeanVec = yModMeanVec, 
+                                    yCovMat  = yModCovMat, 
+                                    xMeanVec = xModMeanVec, 
+                                    xCovMat  = xModCovMat)
   
-  compare_equate_out2[[jj]] <- cbind("raw"   = mvS1Out[, 1], 
-                                     "s-eq1" = mvS1Out[, 2], 
-                                     "m-eq1" = mvM1Out[, 2], 
-                                     "m-eq2(1)" = mvM21Out[, 2], 
-                                     "m-eq2(2)" = mvM22Out[, 2])
-  rownames(compare_equate_out2[[jj]]) <- paste("Season", 1:3)
+  compare_equate_out2[[jj]] <- cbind("raw"   = mv1Out[, 1], 
+                                     "m-eq1" = mv1Out[, 2], 
+                                     "m-eq2" = mv2Out[, 2], 
+                                     "m-eq3" = mv3Out[, 2])
 }
         
 compare_equate_out2[1:10]
 
-```
-
-*  Square:  ORF score on the anchor tests
-*  Green:  Equated score using means and full covariance from random intercepts and trends model
-*  Blue:   Equated score using means and variances from random intercepts and trends model
-*  Red:   Equated score using means and variances from random intercepts model
-*  Black:  Equated score using sample means and variances
-
-
-
-```{r, fig.height=25}
-par(mfrow = c(10, 2))
-
-for(ii in 1:20) 
-{
-par(mar = c(2,2,0.2,0.2))
-plot(NA, ylim = c(0, 200), xlim = c(1, 3))
-  points(y = sub1_ttl_g_w[ii, ], x = 1.01:3.01, pch = 22, cex = 1.5)
-  points(y = compare_equate_out2[[ii]][, "m-eq2(2)"], x = 1:3, pch = 16, col = "green", cex = 1.5)
-  points(y = compare_equate_out2[[ii]][, "m-eq2(1)"], x = 0.99:2.99, pch = 16, col = "blue", cex = 1.5)
-  points(y = compare_equate_out2[[ii]][, "m-eq1"], x = 0.98:2.98, pch = 16, col = "red", cex = 1.5)
-  points(y = compare_equate_out2[[ii]][, "s-eq1"], x = 1.02:3.02, pch = 16, col = "black", cex = 1.5)
-}
 
 ```
+
+
 
 
 

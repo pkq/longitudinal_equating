@@ -2,8 +2,6 @@
 #------------------------------------------------------------------------------#
 # EM algorithm for regression when missing data mechanism is assumed ignorable
 #------------------------------------------------------------------------------#
-
-
 EM_y <- function(DD, inits = "empirical", eps = 1e-5, max.iter = 500, returnE = F) {
   # DD is data
 	# inits can be a length 2 list for mean and cov matirx

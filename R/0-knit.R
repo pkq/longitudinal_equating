@@ -12,8 +12,13 @@ r_dir <- paste(p_dir, "R", sep = "/")
 d_dir <- paste(p_dir, "data", sep = "/")
 f_dir <- paste(r_dir, "functions", sep = "/")
 
-source(paste(r_dir, "EM_y.R", sep = "/"))
-source(paste(r_dir, "emMeanCov.R", sep = "/"))
+options(stringsAsFactors = FALSE)
+'%!in%' <- function(x,y)!('%in%'(x,y))
+source(paste(f_dir, "linear_equate_x_to_y1.R", sep = "/"))
+source(paste(f_dir, "linear_equate_x_to_y2.R", sep = "/"))
+source(paste(f_dir, "mv_linear_equate_x_to_y.R", sep = "/"))
+source(paste(f_dir, "EM_y.R", sep = "/"))
+
 
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE)
 
