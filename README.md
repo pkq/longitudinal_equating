@@ -1,1 +1,4 @@
-# longitudinal_equating
+# Methods for Longitudinal Equating
+
+
+## Project Description
