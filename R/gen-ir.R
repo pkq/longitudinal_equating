@@ -1,5 +1,17 @@
+#------------------------------------------------------------------------------#
+# gen_ir.R generates item responses and sum scores for a group of examinees.
+# The item responses are generated from theta's that arise from a growth model.
+# The anchor form is the repeated form at all T time points whereas the benchmark
+# forms differ at each time point. 
+#------------------------------------------------------------------------------#
 
+## Define relative paths
+rDir <- "./R"
+rdsDir <- paste(rDir, "Rds", sep = "/")
 
+## load libraries
+library(mvtnorm)
+library(lsasim)
 
 #------------------------------------------------------------------------------#
 # Generate Thetas
@@ -126,16 +138,36 @@ for (tt in 1:T)
 }
 
 
-head(bRspWideList[[1]])
+#------------------------------------------------------------------------------#
+# Save output
+#------------------------------------------------------------------------------#
 
+## Save anchor and benchmark item responses (wide and long)
+saveRDS(bRspWideList, paste(rdsDir, "anchorIrfWide.Rds", sep "/"))
+saveRDS(bRspWideList, paste(rdsDir, "benchmarkIrfWide.Rds", sep "/"))
+
+saveRDS(bRspWideList, paste(rdsDir, "anchorIrfLong.Rds", sep "/"))
+saveRDS(bRspWideList, paste(rdsDir, "benchmarkIrfLong.Rds", sep "/"))
+
+
+## create sum scores
 aSumScoreList <- lapply(aRspWideList, rowSums)
 bSumScoreList <- lapply(bRspWideList, rowSums)
+
+## Save anchor and benchmark sum score
+saveRDS(aSumScoreList, paste(rdsDir, "anchorSumScores.Rds", sep "/"))
+saveRDS(bSumScoreList, paste(rdsDir, "benchmarkSumScores.Rds", sep "/"))
+
+
+#------------------------------------------------------------------------------#
+# Plot scores
+#------------------------------------------------------------------------------#
 
 par(mfrow = c(1, 3))
 for(ii in 1:T)
 {
-  plot(density(aSumScoreList[[ii]][1:250]freq = TRUE))
-  lines(density(bSumScoreList[[ii]][251:500], freq = TRUE), col = "red")
+  plot(density(aSumScoreList[[ii]][1:250]))
+  lines(density(bSumScoreList[[ii]][251:500]), col = "red")
 }
 
 
@@ -147,13 +179,6 @@ plot(x = 1:T, y = colMeans(aSumScoreDf), type = "l")
 lines(x = 1:T, y = colMeans(bSumScoreDf), col = "red")
 
 
-
-
-## Mean Equate
-
-## Linear Equate
-## Equipercentile Equate
-## Longitudinal Linear Equate
 
 
 
