@@ -143,11 +143,11 @@ for (tt in 1:T)
 #------------------------------------------------------------------------------#
 
 ## Save anchor and benchmark item responses (wide and long)
-saveRDS(bRspWideList, paste(rdsDir, "anchorIrfWide.Rds", sep "/"))
-saveRDS(bRspWideList, paste(rdsDir, "benchmarkIrfWide.Rds", sep "/"))
+saveRDS(bRspWideList, paste(rdsDir, "anchorIrfWide.Rds", sep = "/"))
+saveRDS(bRspWideList, paste(rdsDir, "benchmarkIrfWide.Rds", sep = "/"))
 
-saveRDS(bRspWideList, paste(rdsDir, "anchorIrfLong.Rds", sep "/"))
-saveRDS(bRspWideList, paste(rdsDir, "benchmarkIrfLong.Rds", sep "/"))
+saveRDS(bRspWideList, paste(rdsDir, "anchorIrfLong.Rds", sep = "/"))
+saveRDS(bRspWideList, paste(rdsDir, "benchmarkIrfLong.Rds", sep = "/"))
 
 
 ## create sum scores
@@ -155,8 +155,8 @@ aSumScoreList <- lapply(aRspWideList, rowSums)
 bSumScoreList <- lapply(bRspWideList, rowSums)
 
 ## Save anchor and benchmark sum score
-saveRDS(aSumScoreList, paste(rdsDir, "anchorSumScores.Rds", sep "/"))
-saveRDS(bSumScoreList, paste(rdsDir, "benchmarkSumScores.Rds", sep "/"))
+saveRDS(aSumScoreList, paste(rdsDir, "anchorSumScores.Rds", sep = "/"))
+saveRDS(bSumScoreList, paste(rdsDir, "benchmarkSumScores.Rds", sep = "/"))
 
 
 #------------------------------------------------------------------------------#
