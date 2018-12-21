@@ -126,6 +126,7 @@ for (tt in 1:T)
 }
 
 
+head(bRspWideList[[1]])
 
 aSumScoreList <- lapply(aRspWideList, rowSums)
 bSumScoreList <- lapply(bRspWideList, rowSums)
@@ -133,8 +134,8 @@ bSumScoreList <- lapply(bRspWideList, rowSums)
 par(mfrow = c(1, 3))
 for(ii in 1:T)
 {
-  plot(density(aSumScoreList[[ii]][1:250]))
-  lines(density(bSumScoreList[[ii]][251:500]), col = "red")
+  plot(density(aSumScoreList[[ii]][1:250]freq = TRUE))
+  lines(density(bSumScoreList[[ii]][251:500], freq = TRUE), col = "red")
 }
 
 
@@ -149,6 +150,7 @@ lines(x = 1:T, y = colMeans(bSumScoreDf), col = "red")
 
 
 ## Mean Equate
+
 ## Linear Equate
 ## Equipercentile Equate
 ## Longitudinal Linear Equate
