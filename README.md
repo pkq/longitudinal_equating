@@ -24,3 +24,12 @@ Understand if univariate equating solutions can recover a within-examinee growth
     2. Multivariate distributions (over time)
 
 
+## R Files
+
+`gen-ir.R`: generates item responses and sum scores from a known growth model
+
+`univariate-equate.R`: computes equated scores using univariate methods
+
+
+
+
