@@ -45,15 +45,6 @@ bScore_3 <- bSumScoreList[[3]][251:500]
 
 library(equate)
 
-## time 1
-# Convert list to vectors # 
-unlist(bScore_1, recursive = TRUE, use.names = TRUE)
-unlist(aScore_1, recursive = TRUE, use.names = TRUE)
-unlist(bScore_2, recursive = TRUE, use.names = TRUE)
-unlist(aScore_2, recursive = TRUE, use.names = TRUE)
-unlist(bScore_3, recursive = TRUE, use.names = TRUE)
-unlist(aScore_3, recursive = TRUE, use.names = TRUE)
-
 # create frequency table for anchor and benchmark forms # 
 aScore_1_freq <- freqtab(aScore_1)
 bScore_1_freq <- freqtab(bScore_1)
