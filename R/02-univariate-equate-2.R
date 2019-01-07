@@ -28,7 +28,6 @@ T <- length(aSumScoreList)
 aObsScoreList <- lapply(aSumScoreList, function(vec) vec[1:250])
 bObsScoreList <- lapply(bSumScoreList, function(vec) vec[251:500])
 
-
 #------------------------------------------------------------------------------#
 # Compute score frequencies
 #------------------------------------------------------------------------------#
@@ -41,7 +40,6 @@ bFreqTable <- lapply(bObsScoreList, freqtab)
 aFreqSummary <- lapply(aFreqTable, summary)
 bFreqSummary <- lapply(bFreqTable, summary)
 
-
 #------------------------------------------------------------------------------#
 # Concordance functions
 #------------------------------------------------------------------------------#
@@ -49,12 +47,7 @@ buildConcordance <- function(tt, eqType)
 {
   eqMean_t <- equate(bFreqTable[[tt]], aFreqTable[[tt]], 
                      type = eqType, verbose = TRUE)
-
-  # create a look-up table that includes target score and equated score 
-  # create new variables: season and equating method 
-  # rename variables: season 
-  # reorder variables 
-  
+]  
   eqMeanTab_t <- eqMean_t$concordance
   colnames(eqMeanTab_t) <- c("targetScore", "equatedScore")
    
@@ -69,7 +62,6 @@ eqMean <- lapply(seq_along(1:T), buildConcordance, eqType = "mean")
 eqLin <- lapply(seq_along(1:T), buildConcordance, eqType = "linear")
 
 eqEqp <- lapply(seq_along(1:T), buildConcordance, eqType = "equipercentile")
-
 
 #------------------------------------------------------------------------------#
 # Save
