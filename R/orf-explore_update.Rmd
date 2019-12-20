@@ -1,0 +1,452 @@
+---
+title: "ORF Exploration"
+author: "Tyler H. Matta"
+
+header-includes:
+    - \usepackage{bm}
+    - \usepackage{bbm}
+
+output:
+  html_document: default
+  pdf_document: default    
+---
+
+First, we must define the score distribution. Traditionally, we equate test forms that were taken within a single test window.  That is, we have been working with univariate score distributions. In the context of repeated measures, one can choose to extend this approach by equating forms within a single time frame. That would result defining univariate score distributions at each time point, what we will call a multi-univariate appraoch. 
+
+Finally, since an objective of a reapeated meaures testing program is to measure growth, one could argue that the score distribution should be defined as multivariate. That is, rahter than ignore the the dependece structure resulting from the same examinees taking exams multiple times, we estimate the covariance. 
+
+There are two mains options for how one goes about defining the score distributions. First, one can use the sample data directly, often referred to as the empirical score distribution.  Alternatively, one can define a model for the score distribution.  Using the empirical score distribution is best when euquating is to be done for opertation tests where it is the sample of examinees who are of primary importance.  However, a model-based distribution is defenisble when the scores come from a field test and the equating solution is to be used to reconcile form differences for future examinees.  That is, the sample distribution is like to exhibit nuances that are unique to the sample and would not generalize, where the model-based appraoch would make the assumption that the observed field test data, and future data are generated from the same model. 
+
+In the current context we're dealing with a linear equating solution, which requires a mean and a variance for a multi-univariate approach and mean vector and covariance matrix for a multidimensional approach. 
+
+In the multivariate context, one can go about computing the sample mean vector and sample covariance matrix as follows,
+
+$$
+\mu = \frac{1}{N} \sum^{N}_{i = 1} y_{ij}, \; j = 1, \ldots, K
+$$
+
+$$
+\Sigma = \frac{1}{N-1} \left( {\bf Y} - \bar{{\bf y}}{\bf 1}^{\prime}_{N} \right) \left( {\bf Y} - \bar{{\bf y}}{\bf 1}^{\prime}_{N} \right)^{\prime}
+$$
+
+Alternatively, one can obrtain a model-implied moment by fitting  a growth model to the repeated measures. 
+$$
+{\bf y}_{i} = {\bf X}_{i} \, \beta + {\bf Z}_{i} \, \zeta_{i} + \epsilon_{i}
+$$
+where
+$$
+\epsilon_{i} \sim \mathcal{N}(0, \psi^{2}) \textrm{ and } \zeta_{i} \sim \mathcal{N}({\bf 0}, \mathrm{T})
+$$
+
+We can then use the estimated fixed effects, $\beta$, estimated variance components, $\psi^{2}$ and $\mathrm{T}$, along with the design matrices ${\bf X}$ and ${\bf Z}$ to obtain the model implied mean and covariance matrices, 
+
+\begin{align}
+\mu &= {\bf X} \, \beta \\
+\Sigma &= {\bf Z} \, \mathrm{T} \, {\bf Z}^{\prime} + \psi^{2} \bf{I}
+\end{align}
+
+There are, of course, other ways one could go about establishing a mean and covariance. It is not currently obvious how onw would extend a model-based approach for equating solutions that require more information about the score distributions, e.g. equipercentile equating. 
+
+In what follows, describe the required design elements for putsue a repeated measures equating project.  Next, we show how the multivariate linear equating solution generalizes the univariate linear equating solution through the multi-univariate approach. Next, we show how a multi-univariate solution results in different solution than the multivariate equating solutions. That is, constrining the off-diagonal elements of a covariance matrix indeed has an impact on the equating solution. 
+
+
+### Design
+
+The task is to equate a set of linear forms onto a single scale such that students who are assessed throughout the year can be compared regardless of the test form used.  The goal of such an assessment program is not only to understand where a student is in their reading ability today, often refered to as a status measure, but to understand how the students reading ability has changed over the course of some time period. Such a program assesses an examinne multiple times with a desire to infer from the changes in the test scores how a studnets reading ability has grown.  
+
+Examinees are randomly assigned to groups, enabling the common group assumption. This assumption not only supposes that the ability distribution is the same at the start, but that the distribution of ability over time remains equal. 
+
+Once group should be adminstered the same for at each time point. We call this the achor for as it is the one that all other forms will be equated to. By using an anchor form at each time point, we are able to understand how the ability distribution changes over time. That is, for the anchor group we assume the test characteristics remain unchanged, and it is ability that is changing over time. For this to hold, we must assume that changes in ability are not triggered by practice effects. This is a testable assumption with a proper design.  If the test is violated, one could conceivably correct for the practice effects.
+
+Finally, all reamaining groups can be adminstered differing forms at each time point.  
+
+
+
+```{r loadData}
+measure <- "orf"
+
+fn <- paste0(measure, "-raw.csv")
+ttl <- read.csv(file = paste(d_dir, fn, sep = "/"))
+```
+
+```{r}
+grd <- 2
+
+## Subset grade
+ttl_g <- ttl[ttl$grade == grd, ]
+
+benchmarkId <- c(1, 2, 3)
+anchorId <- 4
+seasonId <- sort(unique(ttl_g$season))
+
+ttl_g <- ttl_g[ttl_g$probe_id %in% c(benchmarkId, anchorId), ]
+
+# nrow(ttl_g)
+# length(unique(ttl_g$anon_id))
+
+table(ttl_g$season, ttl_g$probe_id)
+```
+
+
+```{r}
+ttl_g$season_probe <- paste(ttl_g$season, ttl_g$probe_id, sep = "-")
+
+## Reshape to wide
+ttl_g_w <- reshape(ttl_g[, c("anon_id", "season_probe", "total")],
+                    timevar = "season_probe",
+                    idvar = c("anon_id"),
+                    direction = "wide", sep = "-")
+
+anchorCols <- paste("total", seasonId, anchorId, sep = "-")
+benchmarkCols <- paste("total", seasonId, benchmarkId, sep = "-")
+ttl_g_w <- ttl_g_w[, c("anon_id", anchorCols , benchmarkCols)]
+
+## Form pattern 
+ttl_g_w$s1a <- ifelse(is.na(ttl_g_w[, anchorCols[1]]), "0", "A")
+ttl_g_w$s2a <- ifelse(is.na(ttl_g_w[, anchorCols[2]]), "0", "A")
+ttl_g_w$s3a <- ifelse(is.na(ttl_g_w[, anchorCols[3]]), "0", "A")
+ttl_g_w$s1b <- ifelse(is.na(ttl_g_w[, benchmarkCols[1]]), "0", "B")
+ttl_g_w$s2b <- ifelse(is.na(ttl_g_w[, benchmarkCols[2]]), "0", "B")
+ttl_g_w$s3b <- ifelse(is.na(ttl_g_w[, benchmarkCols[3]]), "0", "B")
+
+ttl_g_w$pattern <- paste0(ttl_g_w$s1a, ttl_g_w$s1b, "-", 
+                         ttl_g_w$s2a, ttl_g_w$s2b, "-", 
+                         ttl_g_w$s3a, ttl_g_w$s3b)
+
+formPattern <- table(Pattern = ttl_g_w$pattern)
+# formPattern %>%
+#   kable() %>%
+#   kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+### WpM Distributions
+
+```{r, echo=FALSE, fig.width=9, fig.height=6}
+xMax <- 250
+yMax <- 60
+par(mfrow = c(2, 3))
+hist(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 1], ylim = c(0, yMax), xlim = c(0, xMax),
+     main = "Season 1, Form 4", xlab = "Words per Minute")
+hist(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 2], ylim = c(0, yMax), xlim = c(0, xMax),
+     main = "Season 2, Form 4", xlab = "Words per Minute")
+hist(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 3], ylim = c(0, yMax), xlim = c(0, xMax),
+     main = "Season 3, Form 4", xlab = "Words per Minute")
+hist(ttl_g$total[ttl_g$probe_id == 1 & ttl_g$season == 1], ylim = c(0, yMax), xlim = c(0, xMax),
+     main = "Season 1, Form 1", xlab = "Words per Minute")
+hist(ttl_g$total[ttl_g$probe_id == 2 & ttl_g$season == 2], ylim = c(0, yMax), xlim = c(0, xMax),
+     main = "Season 2, Form 2", xlab = "Words per Minute")
+hist(ttl_g$total[ttl_g$probe_id == 3 & ttl_g$season == 3], ylim = c(0, yMax), xlim = c(0, xMax),
+     main = "Season 3, Form 3", xlab = "Words per Minute")
+```
+
+
+### Univariate linear equating
+
+Kolen and Brennan define a linear equating solution as:
+
+$$
+l_{a}(b) = \frac{\sigma_{a}}{\sigma_{b}} \mu_{b} + \left[ \mu_{a} - \frac{\sigma_{a}}{\sigma_{b}}\mu_{b} \right]
+$$
+
+where $(\mu_{a}, \, \sigma_{a})$ and $(\mu_{b}, \, \sigma_{b})$ are the empirical means and standard deviations for the anchor form and corresponding benchmark form, respectively.  
+
+
+#### Empirical moments
+
+We start by computing the empirical means and variances for the anchor form at each season. The means reside in `yEmpMeanVec` while the variances reside in `yEmpVarVec`, and `yEmpSdVec` contains the standard deviations.
+
+```{r}
+yEmpMeanVec <- c(mean(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 1]), 
+                 mean(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 2]),
+                 mean(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 3]))
+
+yEmpVarVec <- c(var(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 1]), 
+                var(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 2]),
+                var(ttl_g$total[ttl_g$probe_id == 4 & ttl_g$season == 3]))
+
+yEmpSdVec <- sqrt(yEmpVarVec)
+
+yEmpMat <- rbind(yEmpMeanVec, yEmpVarVec, yEmpSdVec)
+colnames(yEmpMat) <- c("1", "2", "3")
+
+yEmpMat %>%
+ kable() %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+We do the same for each of the benchmark forms.
+
+```{r, echo=TRUE}
+xEmpMeanVec <- c(mean(ttl_g$total[ttl_g$probe_id == 1]), 
+                 mean(ttl_g$total[ttl_g$probe_id == 2]),
+                 mean(ttl_g$total[ttl_g$probe_id == 3]))
+
+xEmpVarVec <- c(var(ttl_g$total[ttl_g$probe_id == 1]), 
+                var(ttl_g$total[ttl_g$probe_id == 2]),
+                var(ttl_g$total[ttl_g$probe_id == 3]))
+
+xEmpSdVec <-  sqrt(xEmpVarVec)
+
+xEmpMat <- rbind(xEmpMeanVec, xEmpVarVec, xEmpSdVec)
+colnames(xEmpMat) <- c("1", "2", "3")
+
+xEmpMat %>%
+ kable() %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+
+#### Linear equating function
+
+
+We can equate the tests using empirical variances instead of standard deviations. This solution proves more general when moving to a matrix solution. 
+
+$$
+l_{a}(b) = \left(\frac{\sigma^{2}_{a}}{\sigma^{2}_{b}} \right)^{1/2} \mu_{b} + \left[ \mu_{a} - \left(\frac{\sigma^{2}_{a}}{\sigma^{2}_{b}} \right)^{1/2}\mu_{b} \right]
+$$
+
+
+The following demonstrates that the equation above, namely taking the square root of the divisor of the variances is identical to divding the standard deviations.
+
+```{r, echo=TRUE}
+xVec <- seq(from = 75, to = 175, by = 5)
+
+linEqXToYSd <- linear_equate_x_to_y1(x      = xVec, 
+                     muY    = yEmpMeanVec[1], 
+                     sigmaY = yEmpSdVec[1], 
+                     muX    = xEmpMeanVec[1], 
+                     sigmaX = xEmpSdVec[1])
+
+linEqXToYVar <- linear_equate_x_to_y2(x      = xVec, 
+                     muY    = yEmpMeanVec[1], 
+                     sigmaY = yEmpVarVec[1], 
+                     muX    = xEmpMeanVec[1], 
+                     sigmaX = xEmpVarVec[1])
+
+cbind(raw = linEqXToYSd[, 1], "u-eq1" = linEqXToYSd[, 2], "u-eq2" = linEqXToYVar[, 2])
+```
+
+
+### Multivariate linear equating
+
+Now, suppose we want to extend the univariate linking solution to equate a set of scores based on a set of means and covariances. That is, rather than input a scalar value for the mean and variance, we utilize a vector valued mean and covariance matrix. The linear equating solution extends to 
+$$
+l_{a}(b) = \textrm{Chol}\left(\Sigma_{a}\Sigma_{b}^{-1}\right) \mu_{b} + \left[ \mu_{a} -\textrm{Chol}\left(\Sigma_{a}\Sigma_{b}^{-1}\right) \mu_{b} \right]
+$$
+
+
+We first demonstrate that equating each benchmarks to the repeated anchor form is equivalent to the multivariate equating when the off-diagonal of the covariance matrix is assumed to be zero.  We do this with a subset of responses in the data. That is, we use the following elements for with the multivariate equating function
+
+```{r}
+list("Y Mean Vector" = yEmpMeanVec, "Y Variances" = diag(yEmpVarVec), "X Mean Vector" = xEmpMeanVec, "X Variances" = diag(xEmpVarVec))
+```
+      
+```{r}
+sub_ttl_g_w <- (ttl_g_w[ttl_g_w$pattern == "AB-AB-AB", ])
+sub1_ttl_g_w <- sub_ttl_g_w[, c("total-1-1", "total-2-2", "total-3-3")]
+sub2_ttl_g_w <- sub_ttl_g_w[, c("total-1-4", "total-2-4", "total-3-4")]
+
+```
+
+```{r, echo=TRUE}
+equate_out <- list()
+
+for(jj in 1:nrow(sub1_ttl_g_w))
+{
+  xVec_j <-  t(unname(as.matrix(sub1_ttl_g_w[jj, ])))
+
+  mvOut <- mv_linear_equate_x_to_y(xVec = xVec_j, 
+                yMeanVec = yEmpMeanVec, 
+                yCovMat = diag(yEmpVarVec), 
+                xMeanVec = xEmpMeanVec, 
+                xCovMat = diag(xEmpVarVec))
+  
+  
+  uvOut <- linear_equate_x_to_y2(x = xVec_j, 
+                        muY    = yEmpMeanVec, 
+                        sigmaY = yEmpVarVec, 
+                        muX    = xEmpMeanVec, 
+                        sigmaX = xEmpVarVec)
+  
+  equate_out[[jj]] <- cbind("raw" = uvOut[, 1], "u-eq" = uvOut[, 2], "m-eq" = mvOut[, 2])
+  rownames(equate_out[[jj]]) <- paste("Season", 1:3)
+
+}
+```
+
+We see that based on the first 10 score sequences, the results from `mv_linear_equate_x_to_y` equal that of `linear_equate_x_to_y2`.
+
+
+```{r}
+ equate_out[1:10] 
+```
+
+
+
+### Multivariate linear equating with model-implied moments
+
+
+We now use `mv_linear_equate_x_to_y` to equate the benchmark forms using model-implied moments based on mixed models that account for individual growth. 
+
+### Model-based means and covariance matrix
+
+```{r, echo=TRUE}
+J <- max(unique(ttl_g$season))
+int <- rep(1, J) 
+slp <- seq(0, J-1)
+Z <- X <- as.matrix(cbind(int, slp))
+```
+
+
+### Random intercepts model
+
+Next, we fit 
+
+```{r, echo=TRUE}
+aM1 <- lmer(total ~ 1 + season + (1 | anon_id), data = ttl_g[ttl_g$probe_id %in% anchorId, ])
+bM1 <- lmer(total ~ 1 + season + (1 | anon_id), data = ttl_g[ttl_g$probe_id %in% benchmarkId, ])
+
+#-- extract variance components 
+aVarComp <- as.data.frame(VarCorr(aM1, order = "lower.tri"))$vcov
+
+aVar   <- aVarComp[1]
+aResid <- aVarComp[2]
+
+bVarComp <- as.data.frame(VarCorr(bM1, order = "lower.tri"))$vcov
+
+bVar   <- bVarComp[1]
+bResid <- bVarComp[2]
+
+#-- compute marginal means and covariance matrix
+aM1CovMat <- diag(rep(aVar, J)) + diag(rep(aResid, nrow(Z)))
+aM1MeanVec <- X %*% fixef(aM1)
+
+bM1CovMat <- diag(rep(bVar, J)) + diag(rep(bResid, nrow(Z)))
+bM1MeanVec <- X %*% fixef(bM1)
+
+list(aM1MeanVec, aM1CovMat, bM1MeanVec, bM1CovMat)
+```
+
+We begin by establishing the design matricies for a random intercepts and slopes growth model. Not that we are constraining the curve to be linear as there are only three time points. 
+
+### Random intercepts and trend model
+
+Next, we fit 
+
+```{r, echo=TRUE}
+aM2 <- lmer(total ~ 1 + season + (1 + season | anon_id), data = ttl_g[ttl_g$probe_id %in% anchorId, ])
+bM2 <- lmer(total ~ 1 + season + (1 + season | anon_id), data = ttl_g[ttl_g$probe_id %in% benchmarkId, ])
+
+#-- extract variance components 
+aVarComp <- as.data.frame(VarCorr(aM2, order = "lower.tri"))$vcov
+
+aCovMat <- matrix(NA, 2, 2)
+aCovMat[1, 1] <- aVarComp[1]
+aCovMat[2, 2] <- aVarComp[2]
+aCovMat[1, 2] <- aCovMat[2, 1] <- aVarComp[3]
+aResid <- aVarComp[4]
+
+bVarComp <- as.data.frame(VarCorr(bM2, order = "lower.tri"))$vcov
+
+bCovMat <- matrix(NA, 2, 2)
+bCovMat[1, 1] <- bVarComp[1]
+bCovMat[2, 2] <- bVarComp[2]
+bCovMat[1, 2] <- bCovMat[2, 1] <- bVarComp[3]
+bResid <- bVarComp[4]
+
+#-- compute marginal means and covariance matrix
+aM2CovMat <- Z %*% aCovMat %*% t(Z) + diag(rep(aResid, nrow(Z)))
+aM2MeanVec <- X %*% fixef(aM1)
+
+bM2CovMat <- Z %*% bCovMat %*% t(Z) + diag(rep(bResid, nrow(Z)))
+bM2MeanVec <- X %*% fixef(bM1)
+
+```
+
+We then use the full covariance in the equating solution as well as the covariance matrix with the off-diagonals constrained to zero.  Note that we are only doing this for purposes of comparison.  
+
+```{r}
+list(aM2MeanVec, aM2CovMat, bM2MeanVec, bM2CovMat)
+
+list(aM2MeanVec, diag(diag(aM2CovMat)), bM2MeanVec, diag(diag(bM2CovMat)))
+```
+
+#### Multidimensional Equating
+
+
+Equating with vector of model implied means and covariance matrices compared to empirical variances. 
+
+*  `s-eq1` uses of the sample means and variances
+*  `m-eq1` uses of the random intercept model-implied means and variances (contraining the covariances to zero)
+*  `m-eq2(1)` uses of the random coefficient model-implied means and variances (contraining the covariances to zero)
+*  `m-eq2(2)` uses of the model-implied means and covariance matrix (same variances as `m-eq2` with covariances unconstrained)
+
+```{r, echo=TRUE}
+compare_equate_out2 <- list()
+
+for (jj in 1:nrow(sub1_ttl_g_w))
+{
+  xVec_j <-  t(unname(as.matrix(sub1_ttl_g_w[jj, ])))
+
+  mvS1Out <- mv_linear_equate_x_to_y(xVec    = xVec_j, 
+                                    yMeanVec = yEmpMeanVec, 
+                                    yCovMat  = diag(yEmpVarVec), 
+                                    xMeanVec = xEmpMeanVec, 
+                                    xCovMat  = diag(xEmpVarVec))
+  
+  mvM1Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
+                                    yMeanVec = aM1MeanVec, 
+                                    yCovMat  = diag(diag(aM1CovMat)), 
+                                    xMeanVec = bM1MeanVec, 
+                                    xCovMat  = diag(diag(bM1CovMat))) 
+
+  mvM21Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
+                                    yMeanVec = aM2MeanVec, 
+                                    yCovMat  = diag(diag(aM2CovMat)), 
+                                    xMeanVec = bM2MeanVec, 
+                                    xCovMat  = diag(diag(bM2CovMat))) 
+
+  mvM22Out <- mv_linear_equate_x_to_y(x        = xVec_j, 
+                                    yMeanVec = aM2MeanVec, 
+                                    yCovMat  = aM2CovMat, 
+                                    xMeanVec = bM2MeanVec, 
+                                    xCovMat  = bM2CovMat)
+  
+  compare_equate_out2[[jj]] <- cbind("raw"   = mvS1Out[, 1], 
+                                     "s-eq1" = mvS1Out[, 2], 
+                                     "m-eq1" = mvM1Out[, 2], 
+                                     "m-eq2(1)" = mvM21Out[, 2], 
+                                     "m-eq2(2)" = mvM22Out[, 2])
+  rownames(compare_equate_out2[[jj]]) <- paste("Season", 1:3)
+}
+        
+compare_equate_out2[1:10]
+
+```
+
+*  Square:  ORF score on the anchor tests
+*  Green:  Equated score using means and full covariance from random intercepts and trends model
+*  Blue:   Equated score using means and variances from random intercepts and trends model
+*  Red:   Equated score using means and variances from random intercepts model
+*  Black:  Equated score using sample means and variances
+
+
+
+```{r, fig.height=25}
+par(mfrow = c(10, 2))
+
+for(ii in 1:20) 
+{
+par(mar = c(2,2,0.2,0.2))
+plot(NA, ylim = c(0, 200), xlim = c(1, 3))
+  points(y = sub1_ttl_g_w[ii, ], x = 1.01:3.01, pch = 22, cex = 1.5)
+  points(y = compare_equate_out2[[ii]][, "m-eq2(2)"], x = 1:3, pch = 16, col = "green", cex = 1.5)
+  points(y = compare_equate_out2[[ii]][, "m-eq2(1)"], x = 0.99:2.99, pch = 16, col = "blue", cex = 1.5)
+  points(y = compare_equate_out2[[ii]][, "m-eq1"], x = 0.98:2.98, pch = 16, col = "red", cex = 1.5)
+  points(y = compare_equate_out2[[ii]][, "s-eq1"], x = 1.02:3.02, pch = 16, col = "black", cex = 1.5)
+}
+
+```
+
+
+
